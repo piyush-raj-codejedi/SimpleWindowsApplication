@@ -1,0 +1,8 @@
+Create a sample windows application that runs on windows 11.
+1. it mimics a flight booking application.
+2. it has a login page and when user logs in with some Hard-coded credentials. 
+3. Then the user can select from and to city from a list of options in the input field.
+4. select a date, and click on a search button.
+5. Once it clicks on the search button it opens a bunch of dummy flights with some dummy values. They could be randomized so that it gives also some hardcode flight names of real airlines.
+6. The user can select one of the flight names or flights and confirm a booking. Once booked should also be shown in a journey history option which is a sidebar application.
+7. it should also have the home button, profile button, journey history button all fully functional and logout Which logs out the user from the login page 
