@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import ttk
 
 
-class Sidebar(tk.Frame):
+class Sidebar(ttk.Frame):
     SIDEBAR_WIDTH = 220
 
     def __init__(self, parent, controller):
