@@ -12,7 +12,10 @@ class BookingPage(tk.Frame):
         super().__init__(parent, bg="#f4f6f9")
         self.controller = controller
         self.selected_flight = None
-        self.view_mode = "search"  # search | history | processing | success
+        self.selected_iid = None
+        self.view_mode = "search"
+        # iid -> Flight  (used so we don't put objects in tree tags)
+        self._flight_by_iid = {}
 
         self._build_search_panel()
         self._build_results_panel()
@@ -28,9 +31,8 @@ class BookingPage(tk.Frame):
 
         header_row = ttk.Frame(frame)
         header_row.pack(fill="x")
-        ttk.Label(header_row, text="Book a Flight", style="Header.TLabel").pack(
-            side="left", anchor="w")
-        # Decorative line
+        ttk.Label(header_row, text="Book a Flight",
+                  style="Header.TLabel").pack(side="left", anchor="w")
         ttk.Separator(header_row, orient="horizontal").pack(
             side="left", fill="x", expand=True, padx=(16, 0), pady=14)
 
@@ -70,14 +72,14 @@ class BookingPage(tk.Frame):
                                     font=("Segoe UI", 10), state="readonly", width=24)
         self.date_entry.pack(fill="x", pady=(4, 0))
 
-        self.cal_btn = ttk.Button(date_left, text="\U0001F4C5  Select Date",
+        self.cal_btn = ttk.Button(date_left, text="Select Date",
                                   style="Accent.TButton", command=self._open_calendar)
         self.cal_btn.pack(fill="x", pady=(8, 0))
 
         # Search button
         btn_row = ttk.Frame(frame)
         btn_row.pack(fill="x", pady=(14, 4))
-        ttk.Button(btn_row, text="\U0001F50D  Search Flights", style="Primary.TButton",
+        ttk.Button(btn_row, text="Search Flights", style="Primary.TButton",
                    command=self.search).pack(side="right")
 
     def _open_calendar(self):
@@ -133,7 +135,7 @@ class BookingPage(tk.Frame):
         self.history_tree.column("Route", anchor="w")
         self.history_tree.pack(fill="both", expand=True, pady=(0, 10))
 
-        self.back_btn = ttk.Button(frame, text="\u2B05  Back to Search",
+        self.back_btn = ttk.Button(frame, text="Back to Search",
                                    style="Primary.TButton",
                                    command=lambda: self._set_view("search"))
         self.back_btn.pack(side="right")
@@ -144,26 +146,19 @@ class BookingPage(tk.Frame):
         frame = ttk.Frame(self, style="Card.TFrame", padding=40)
         self.processing_frame = frame
 
-        # Spinner
-        self.spinner_var = tk.StringVar(value="\U0001F55B")
+        self.spinner_var = tk.StringVar(value="Processing...")
         tk.Label(frame, textvariable=self.spinner_var,
-                 font=("Segoe UI", 54), bg="#ffffff",
-                 foreground="#1e3a5f").pack(pady=(30, 16))
+                 font=("Segoe UI", 14, "bold"), bg="#ffffff",
+                 foreground="#1e3a5f").pack(pady=(40, 16))
 
-        self.processing_label = ttk.Label(frame,
-                                          text="Processing your booking...",
-                                          font=("Segoe UI", 14, "bold"),
-                                          foreground="#1e3a5f", style="Card.TLabel")
-        self.processing_label.pack()
-
-        ttk.Label(frame, text="Please wait while we confirm your flight reservation.",
-                  font=("Segoe UI", 10), foreground="#666", style="Card.TLabel").pack(
-            pady=(8, 0))
+        ttk.Label(frame, text="Please wait while we confirm your booking.",
+                  font=("Segoe UI", 10), foreground="#666", style="Card.TLabel").pack()
 
         self.spinner_frames = [
-            "\U0001F55B", "\U0001F550", "\U0001F551", "\U0001F552",
-            "\U0001F553", "\U0001F554", "\U0001F555", "\U0001F556",
-            "\U0001F557", "\U0001F558", "\U0001F559", "\U0001F55A",
+            "\u2022\u2022\u2022",
+            "\u2022\u2022 \u00A0",
+            "\u2022 \u00A0\u00A0",
+            " \u00A0\u00A0\u00A0",
         ]
         self._spinner_idx = 0
         self._spinner_job = None
@@ -190,7 +185,6 @@ class BookingPage(tk.Frame):
         frame = ttk.Frame(self, style="Card.TFrame", padding=40)
         self.success_frame = frame
 
-        # Large green check
         tk.Label(frame, text="\u2705", font=("Segoe UI", 64),
                  bg="#ffffff").pack(pady=(30, 12))
 
@@ -202,7 +196,6 @@ class BookingPage(tk.Frame):
 
         ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=(12, 0))
 
-        # Booking details card
         details = ttk.Frame(frame, style="Card.TFrame")
         details.pack(fill="x", pady=(14, 0))
 
@@ -217,13 +210,12 @@ class BookingPage(tk.Frame):
             val.pack(side="left", fill="x", expand=True)
             self.detail_labels[label] = val
 
-        # Buttons
         btn_frame = ttk.Frame(frame)
         btn_frame.pack(fill="x", pady=(20, 0))
-        ttk.Button(btn_frame, text="\U0001F3A5  Book Another",
+        ttk.Button(btn_frame, text="Book Another",
                    style="Primary.TButton",
                    command=self._go_home_from_success).pack(side="right", padx=(8, 0))
-        ttk.Button(btn_frame, text="\u2B05  Home",
+        ttk.Button(btn_frame, text="Home",
                    style="Accent.TButton",
                    command=self._go_home_from_success).pack(side="right")
 
@@ -233,8 +225,8 @@ class BookingPage(tk.Frame):
         self.detail_labels["Flight"].config(text=f"{f.airline}  ({f.flight_id})")
         self.detail_labels["Route"].config(text=f"{f.origin}  \u2192  {f.destination}")
         dep_arr = f"Departs {f.departure_time}  |  Arrives {f.arrival_time}"
-        self.detail_labels["Date & Time"].config(text=f"{f.date}  —  {dep_arr}")
-        self.detail_labels["Fare"].config(text=f"${f.price:.2f}")
+        self.detail_labels["Date & Time"].config(text=f"{f.date}  \u2014  {dep_arr}")
+        self.detail_labels["Fare"].config(text=f"${f.price}")
         self.detail_labels["Booking ID"].config(text=booking.booking_id)
 
     def _go_home_from_success(self):
@@ -247,22 +239,22 @@ class BookingPage(tk.Frame):
                    self.processing_frame, self.success_frame):
             fr.pack_forget()
 
+    def _show_search(self):
+        self.results_frame.pack(fill="both", expand=True, pady=(0, 8))
+
     def _set_view(self, mode):
         self.view_mode = mode
         self._hide_all()
         if mode == "search":
-            self._toggle_search(True)
+            self._show_search()
             self._stop_spinner()
         elif mode == "history":
-            self._toggle_search(False)
             self.history_frame.pack(fill="both", expand=True, pady=(0, 8))
             self.refresh_history()
         elif mode == "processing":
-            self._toggle_search(False)
             self.processing_frame.pack(fill="both", expand=True, pady=(0, 8))
             self._start_spinner()
         elif mode == "success":
-            self._toggle_search(False)
             self.success_frame.pack(fill="both", expand=True, pady=(0, 8))
             self._stop_spinner()
 
@@ -285,7 +277,9 @@ class BookingPage(tk.Frame):
         self.date_var.set("")
         for row in self.results_tree.get_children():
             self.results_tree.delete(row)
+        self._flight_by_iid.clear()
         self.selected_flight = None
+        self.selected_iid = None
 
     # ── Search ──
 
@@ -305,7 +299,6 @@ class BookingPage(tk.Frame):
             messagebox.showwarning("Incomplete", "Please select a travel date.")
             return
 
-        # ── Date validation ──
         try:
             travel_date = datetime.strptime(date, "%Y-%m-%d").date()
         except ValueError:
@@ -321,20 +314,21 @@ class BookingPage(tk.Frame):
                                  "Please pick today or a future date.")
             return
 
-        # Generate flights
         flights = generate_flights(origin, destination, date)
 
         for row in self.results_tree.get_children():
             self.results_tree.delete(row)
+        self._flight_by_iid.clear()
 
         for i, f in enumerate(flights):
             tag = "even" if i % 2 == 0 else "odd"
-            self.results_tree.insert(
+            iid = self.results_tree.insert(
                 "", "end",
                 values=(f.airline, f.flight_id, f.date,
                         f.departure_time, f.arrival_time, f"${f.price}"),
-                tags=(tag, f),
+                tags=(tag,),
             )
+            self._flight_by_iid[iid] = f
 
         self.results_header.config(
             text=f"Flights: {origin}  \u2192  {destination}  ({date})")
@@ -345,18 +339,17 @@ class BookingPage(tk.Frame):
         sel = self.results_tree.selection()
         if not sel:
             return
-        item = self.results_tree.item(sel[0])
-        self.selected_flight = item["tags"][1]
+        iid = sel[0]
+        self.selected_flight = self._flight_by_iid.get(iid)
+        self.selected_iid = iid
 
         for row in self.results_tree.get_children():
             tags = list(self.results_tree.item(row)["tags"])
-            if len(tags) >= 2:
-                tags[1] = ""
-            else:
-                tags.append("")
-            self.results_tree.item(row, tags=tuple(tags[:2]))
+            if "selected" in tags:
+                tags.remove("selected")
+            self.results_tree.item(row, tags=tuple(tags))
 
-        self.results_tree.item(sel[0], tags=("selected", self.selected_flight))
+        self.results_tree.item(iid, tags=["selected"])
 
     # ── Booking flow ──
 
@@ -372,16 +365,17 @@ class BookingPage(tk.Frame):
         booking = Booking(user=user, flight=flight, passenger_name=user.name)
         self.controller.add_booking(booking)
 
-        # 1. Show processing
+        # Show processing animation
         self.show_processing()
 
-        # 2. After 2 seconds, show success
+        # After 2 seconds, show success
         def show_success_deferred():
             self.show_success(booking)
 
         self.controller.root.after(2000, show_success_deferred)
 
         self.selected_flight = None
+        self.selected_iid = None
 
     # ── History ──
 
