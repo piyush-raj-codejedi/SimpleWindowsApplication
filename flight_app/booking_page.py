@@ -1,119 +1,389 @@
-"""Booking page UI — flight search, booking, and journey history view."""
+"""Booking page UI — flight search, booking, calendar, and journey history."""
 import tkinter as tk
 from tkinter import ttk, messagebox
+from datetime import datetime
 
 from models import CITIES, Booking, generate_flights
+from calendar_widget import DatePicker
 
 
 class BookingPage(tk.Frame):
     def __init__(self, parent, controller):
-        super().__init__(parent)
+        super().__init__(parent, bg="#f4f6f9")
         self.controller = controller
         self.selected_flight = None
+        self.view_mode = "search"  # search | history | processing | success
 
-        self._build_search()
-        self._build_results()
-        self._build_history()
+        self._build_search_panel()
+        self._build_results_panel()
+        self._build_history_panel()
+        self._build_processing_panel()
+        self._build_success_panel()
 
-    def _build_search(self):
-        frame = ttk.Frame(self, style="Card.TFrame", padding=20)
-        frame.pack(fill="x", padx=0, pady=(0, 10))
+    # ── Search Panel ──
 
-        ttk.Label(frame, text="Book a Flight", style="Header.TLabel").pack(anchor="w")
+    def _build_search_panel(self):
+        frame = ttk.Frame(self, style="Card.TFrame", padding=24)
+        frame.pack(fill="x", padx=0, pady=(0, 8))
 
+        header_row = ttk.Frame(frame)
+        header_row.pack(fill="x")
+        ttk.Label(header_row, text="Book a Flight", style="Header.TLabel").pack(
+            side="left", anchor="w")
+        # Decorative line
+        ttk.Separator(header_row, orient="horizontal").pack(
+            side="left", fill="x", expand=True, padx=(16, 0), pady=14)
+
+        # From / To row
         row = ttk.Frame(frame)
-        row.pack(fill="x", pady=(12, 0))
+        row.pack(fill="x", pady=(14, 0))
 
-        # From
         f1 = ttk.Frame(row)
         f1.pack(side="left", fill="x", expand=True)
-        ttk.Label(f1, text="From", style="Card.TLabel").pack(anchor="w")
-        self.from_city = ttk.Combobox(f1, values=sorted(CITIES), state="readonly", font=("Segoe UI", 10), width=22)
-        self.from_city.pack(fill="x", pady=(2, 0))
+        ttk.Label(f1, text="From", font=("Segoe UI", 9, "bold"),
+                  foreground="#555").pack(anchor="w")
+        self.from_city = ttk.Combobox(f1, values=sorted(CITIES),
+                                      state="readonly", font=("Segoe UI", 10))
+        self.from_city.pack(fill="x", pady=(4, 0), ipady=4)
 
-        # Arrow
-        ttk.Label(row, text="  \u27A4  ", style="Sub.TLabel", foreground="#2980b9").pack(side="left")
+        ttk.Label(row, text="  \u27A4  ", font=("Segoe UI", 16),
+                  foreground="#1e3a5f").pack(side="left")
 
-        # To
         f2 = ttk.Frame(row)
         f2.pack(side="left", fill="x", expand=True)
-        ttk.Label(f2, text="To", style="Card.TLabel").pack(anchor="w")
-        self.to_city = ttk.Combobox(f2, values=sorted(CITIES), state="readonly", font=("Segoe UI", 10), width=22)
-        self.to_city.pack(fill="x", pady=(2, 0))
+        ttk.Label(f2, text="To", font=("Segoe UI", 9, "bold"),
+                  foreground="#555").pack(anchor="w")
+        self.to_city = ttk.Combobox(f2, values=sorted(CITIES),
+                                    state="readonly", font=("Segoe UI", 10))
+        self.to_city.pack(fill="x", pady=(4, 0), ipady=4)
 
-        # Date
+        # Date + calendar button
         date_row = ttk.Frame(frame)
-        date_row.pack(fill="x", pady=(10, 0))
-        ttk.Label(date_row, text="Travel Date", style="Card.TLabel").pack(anchor="w")
+        date_row.pack(fill="x", pady=(12, 0))
+        date_left = ttk.Frame(date_row)
+        date_left.pack(side="left", fill="x", expand=True)
+        ttk.Label(date_left, text="Travel Date", font=("Segoe UI", 9, "bold"),
+                  foreground="#555").pack(anchor="w")
+
         self.date_var = tk.StringVar()
-        self.date_entry = ttk.Entry(date_row, textvariable=self.date_var, font=("Segoe UI", 10), width=24)
-        self.date_entry.pack(fill="x", pady=(2, 0))
-        ttk.Label(date_row, text="(YYYY-MM-DD)", style="Sub.TLabel", foreground="#888").pack(anchor="w")
+        self.date_entry = ttk.Entry(date_left, textvariable=self.date_var,
+                                    font=("Segoe UI", 10), state="readonly", width=24)
+        self.date_entry.pack(fill="x", pady=(4, 0))
+
+        self.cal_btn = ttk.Button(date_left, text="\U0001F4C5  Select Date",
+                                  style="Accent.TButton", command=self._open_calendar)
+        self.cal_btn.pack(fill="x", pady=(8, 0))
 
         # Search button
         btn_row = ttk.Frame(frame)
-        btn_row.pack(fill="x", pady=(12, 0))
-        ttk.Button(btn_row, text="Search Flights", style="Primary.TButton", command=self.search, width=22).pack(
-            side="right"
-        )
+        btn_row.pack(fill="x", pady=(14, 4))
+        ttk.Button(btn_row, text="\U0001F50D  Search Flights", style="Primary.TButton",
+                   command=self.search).pack(side="right")
 
-    def _build_results(self):
-        results_frame = ttk.Frame(self, style="Card.TFrame", padding=20)
-        results_frame.pack(fill="both", expand=True, pady=(0, 10))
-        self.results_frame = results_frame
+    def _open_calendar(self):
+        def on_pick(date_str):
+            self.date_var.set(date_str)
+        DatePicker(self, on_select=on_pick)
 
-        self.results_header = ttk.Label(results_frame, text="Search Results", style="Header.TLabel")
+    # ── Results Panel ──
+
+    def _build_results_panel(self):
+        frame = ttk.Frame(self, style="Card.TFrame", padding=24)
+        frame.pack(fill="both", expand=True, pady=(0, 8))
+        self.results_frame = frame
+
+        self.results_header = ttk.Label(frame, text="Search Results",
+                                        style="Header.TLabel")
         self.results_header.pack(anchor="w")
 
         cols = ("Airline", "Flight #", "Date", "Departs", "Arrives", "Price")
-        self.results_tree = ttk.Treeview(results_frame, columns=cols, show="headings", height=8)
+        self.results_tree = ttk.Treeview(frame, columns=cols, show="headings", height=8)
+        col_widths = {"Airline": 150, "Flight #": 90, "Date": 100,
+                      "Departs": 85, "Arrives": 85, "Price": 80}
         for c in cols:
             self.results_tree.heading(c, text=c)
-            self.results_tree.column(c, width=110, anchor="center")
-        self.results_tree.column("Airline", width=140)
-        self.results_tree.column("Price", width=80)
-        self.results_tree.pack(fill="both", expand=True, pady=(8, 0))
+            self.results_tree.column(c, width=col_widths.get(c, 100), anchor="center")
+        self.results_tree.pack(fill="both", expand=True, pady=(10, 0))
 
         self.results_tree.bind("<ButtonRelease-1>", self.on_select)
         self.results_tree.tag_configure("selected", background="#d4efdf")
+        self.results_tree.tag_configure("even", background="#f8f9fa")
+        self.results_tree.tag_configure("odd", background="#ffffff")
 
-        book_btn = ttk.Button(results_frame, text="Book Selected Flight", style="Success.TButton", command=self.book)
-        book_btn.pack(side="right", pady=(8, 0))
-        self.book_btn = book_btn
+        book_btn = ttk.Button(frame, text="Book Selected Flight",
+                              style="Success.TButton", command=self.book)
+        book_btn.pack(side="right", pady=(10, 0))
 
-    def _build_history(self):
-        history_frame = ttk.Frame(self, style="Card.TFrame", padding=20)
-        self.history_frame = history_frame
+    # ── History Panel ──
 
-        ttk.Label(history_frame, text="Journey History", style="Header.TLabel").pack(anchor="w")
+    def _build_history_panel(self):
+        frame = ttk.Frame(self, style="Card.TFrame", padding=24)
+        self.history_frame = frame
 
-        h_cols = ("Booking ID", "Airline", "Flight #", "Route", "Date", "Status")
-        self.history_tree = ttk.Treeview(history_frame, columns=h_cols, show="headings", height=12)
+        ttk.Label(frame, text="Journey History", style="Header.TLabel").pack(anchor="w")
+        ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=(6, 10))
+
+        h_cols = ("Booking ID", "Route", "Date", "Fare", "Status")
+        self.history_tree = ttk.Treeview(frame, columns=h_cols, show="headings", height=12)
+        h_widths = {"Booking ID": 100, "Route": 210, "Date": 100,
+                    "Fare": 80, "Status": 90}
         for c in h_cols:
             self.history_tree.heading(c, text=c)
-            self.history_tree.column(c, width=100, anchor="center")
-        self.history_tree.column("Airline", width=140)
-        self.history_tree.column("Route", width=200)
-        self.history_tree.column("Booking ID", width=100)
-        self.history_tree.pack(fill="both", expand=True, pady=(8, 0))
+            self.history_tree.column(c, width=h_widths.get(c, 100), anchor="center")
+        self.history_tree.column("Route", anchor="w")
+        self.history_tree.pack(fill="both", expand=True, pady=(0, 10))
 
-        self.back_btn = ttk.Button(history_frame, text="Back to Search", style="Primary.TButton", command=lambda: self._toggle_view(False))
-        self.back_btn.pack(side="right", pady=(8, 0))
+        self.back_btn = ttk.Button(frame, text="\u2B05  Back to Search",
+                                   style="Primary.TButton",
+                                   command=lambda: self._set_view("search"))
+        self.back_btn.pack(side="right")
 
-    def _toggle_view(self, show_history):
-        if show_history:
-            self.results_frame.pack_forget()
-            self.history_frame.pack(fill="both", expand=True, pady=(0, 10))
-        else:
-            self.history_frame.pack_forget()
-            self._repack_results()
+    # ── Processing Panel ──
 
-    def _repack_results(self):
-        self.results_frame.pack(fill="both", expand=True, pady=(0, 10))
+    def _build_processing_panel(self):
+        frame = ttk.Frame(self, style="Card.TFrame", padding=40)
+        self.processing_frame = frame
+
+        # Spinner
+        self.spinner_var = tk.StringVar(value="\U0001F55B")
+        tk.Label(frame, textvariable=self.spinner_var,
+                 font=("Segoe UI", 54), bg="#ffffff",
+                 foreground="#1e3a5f").pack(pady=(30, 16))
+
+        self.processing_label = ttk.Label(frame,
+                                          text="Processing your booking...",
+                                          font=("Segoe UI", 14, "bold"),
+                                          foreground="#1e3a5f", style="Card.TLabel")
+        self.processing_label.pack()
+
+        ttk.Label(frame, text="Please wait while we confirm your flight reservation.",
+                  font=("Segoe UI", 10), foreground="#666", style="Card.TLabel").pack(
+            pady=(8, 0))
+
+        self.spinner_frames = [
+            "\U0001F55B", "\U0001F550", "\U0001F551", "\U0001F552",
+            "\U0001F553", "\U0001F554", "\U0001F555", "\U0001F556",
+            "\U0001F557", "\U0001F558", "\U0001F559", "\U0001F55A",
+        ]
+        self._spinner_idx = 0
+        self._spinner_job = None
+
+    def _start_spinner(self):
+        self._spinner_idx = 0
+        self._animate_spinner()
+
+    def _animate_spinner(self):
+        def tick():
+            self.spinner_var.set(self.spinner_frames[self._spinner_idx])
+            self._spinner_idx = (self._spinner_idx + 1) % len(self.spinner_frames)
+            self._spinner_job = self.controller.root.after(150, tick)
+        tick()
+
+    def _stop_spinner(self):
+        if self._spinner_job:
+            self.controller.root.after_cancel(self._spinner_job)
+            self._spinner_job = None
+
+    # ── Success Panel ──
+
+    def _build_success_panel(self):
+        frame = ttk.Frame(self, style="Card.TFrame", padding=40)
+        self.success_frame = frame
+
+        # Large green check
+        tk.Label(frame, text="\u2705", font=("Segoe UI", 64),
+                 bg="#ffffff").pack(pady=(30, 12))
+
+        self.success_title = ttk.Label(frame,
+                                       text="Booking Confirmed!",
+                                       font=("Segoe UI", 18, "bold"),
+                                       foreground="#27ae60", style="Card.TLabel")
+        self.success_title.pack()
+
+        ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=(12, 0))
+
+        # Booking details card
+        details = ttk.Frame(frame, style="Card.TFrame")
+        details.pack(fill="x", pady=(14, 0))
+
+        self.detail_labels = {}
+        for label in ("Passenger", "Flight", "Route", "Date & Time", "Fare", "Booking ID"):
+            r = ttk.Frame(details)
+            r.pack(fill="x", pady=4)
+            ttk.Label(r, text=f"{label}:", font=("Segoe UI", 9, "bold"),
+                      foreground="#1e3a5f", width=14, style="Card.TLabel").pack(side="left")
+            val = ttk.Label(r, text="", font=("Segoe UI", 10), foreground="#333",
+                            style="Card.TLabel")
+            val.pack(side="left", fill="x", expand=True)
+            self.detail_labels[label] = val
+
+        # Buttons
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(fill="x", pady=(20, 0))
+        ttk.Button(btn_frame, text="\U0001F3A5  Book Another",
+                   style="Primary.TButton",
+                   command=self._go_home_from_success).pack(side="right", padx=(8, 0))
+        ttk.Button(btn_frame, text="\u2B05  Home",
+                   style="Accent.TButton",
+                   command=self._go_home_from_success).pack(side="right")
+
+    def _populate_success(self, booking):
+        self.detail_labels["Passenger"].config(text=booking.passenger_name)
+        f = booking.flight
+        self.detail_labels["Flight"].config(text=f"{f.airline}  ({f.flight_id})")
+        self.detail_labels["Route"].config(text=f"{f.origin}  \u2192  {f.destination}")
+        dep_arr = f"Departs {f.departure_time}  |  Arrives {f.arrival_time}"
+        self.detail_labels["Date & Time"].config(text=f"{f.date}  —  {dep_arr}")
+        self.detail_labels["Fare"].config(text=f"${f.price:.2f}")
+        self.detail_labels["Booking ID"].config(text=booking.booking_id)
+
+    def _go_home_from_success(self):
+        self.controller.show_home()
+
+    # ── View Management ──
+
+    def _hide_all(self):
+        for fr in (self.results_frame, self.history_frame,
+                   self.processing_frame, self.success_frame):
+            fr.pack_forget()
+
+    def _set_view(self, mode):
+        self.view_mode = mode
+        self._hide_all()
+        if mode == "search":
+            self._toggle_search(True)
+            self._stop_spinner()
+        elif mode == "history":
+            self._toggle_search(False)
+            self.history_frame.pack(fill="both", expand=True, pady=(0, 8))
+            self.refresh_history()
+        elif mode == "processing":
+            self._toggle_search(False)
+            self.processing_frame.pack(fill="both", expand=True, pady=(0, 8))
+            self._start_spinner()
+        elif mode == "success":
+            self._toggle_search(False)
+            self.success_frame.pack(fill="both", expand=True, pady=(0, 8))
+            self._stop_spinner()
+
+    # ── Public API ──
 
     def show_history(self):
-        self._toggle_view(True)
-        self.refresh_history()
+        self._set_view("history")
+
+    def show_processing(self):
+        self._set_view("processing")
+
+    def show_success(self, booking):
+        self._populate_success(booking)
+        self._set_view("success")
+
+    def reset(self):
+        self._set_view("search")
+        self.from_city.set("")
+        self.to_city.set("")
+        self.date_var.set("")
+        for row in self.results_tree.get_children():
+            self.results_tree.delete(row)
+        self.selected_flight = None
+
+    # ── Search ──
+
+    def search(self):
+        origin = self.from_city.get()
+        destination = self.to_city.get()
+        date = self.date_var.get().strip()
+
+        if not origin or not destination:
+            messagebox.showwarning("Incomplete", "Please select From and To cities.")
+            return
+        if origin == destination:
+            messagebox.showwarning("Same City",
+                                   "From and To cities must be different.")
+            return
+        if not date:
+            messagebox.showwarning("Incomplete", "Please select a travel date.")
+            return
+
+        # ── Date validation ──
+        try:
+            travel_date = datetime.strptime(date, "%Y-%m-%d").date()
+        except ValueError:
+            messagebox.showerror("Invalid Date",
+                                 "Date must be in YYYY-MM-DD format.\n"
+                                 "Use the calendar picker to select correctly.")
+            return
+
+        today = datetime.now().date()
+        if travel_date < today:
+            messagebox.showerror("Past Date Not Allowed",
+                                 f"Selected date ({date}) is in the past.\n"
+                                 "Please pick today or a future date.")
+            return
+
+        # Generate flights
+        flights = generate_flights(origin, destination, date)
+
+        for row in self.results_tree.get_children():
+            self.results_tree.delete(row)
+
+        for i, f in enumerate(flights):
+            tag = "even" if i % 2 == 0 else "odd"
+            self.results_tree.insert(
+                "", "end",
+                values=(f.airline, f.flight_id, f.date,
+                        f.departure_time, f.arrival_time, f"${f.price}"),
+                tags=(tag, f),
+            )
+
+        self.results_header.config(
+            text=f"Flights: {origin}  \u2192  {destination}  ({date})")
+
+    # ── Row selection ──
+
+    def on_select(self, event):
+        sel = self.results_tree.selection()
+        if not sel:
+            return
+        item = self.results_tree.item(sel[0])
+        self.selected_flight = item["tags"][1]
+
+        for row in self.results_tree.get_children():
+            tags = list(self.results_tree.item(row)["tags"])
+            if len(tags) >= 2:
+                tags[1] = ""
+            else:
+                tags.append("")
+            self.results_tree.item(row, tags=tuple(tags[:2]))
+
+        self.results_tree.item(sel[0], tags=("selected", self.selected_flight))
+
+    # ── Booking flow ──
+
+    def book(self):
+        if not self.selected_flight:
+            messagebox.showwarning("No Selection",
+                                   "Please select a flight first.")
+            return
+
+        flight = self.selected_flight
+        user = self.controller.current_user
+
+        booking = Booking(user=user, flight=flight, passenger_name=user.name)
+        self.controller.add_booking(booking)
+
+        # 1. Show processing
+        self.show_processing()
+
+        # 2. After 2 seconds, show success
+        def show_success_deferred():
+            self.show_success(booking)
+
+        self.controller.root.after(2000, show_success_deferred)
+
+        self.selected_flight = None
+
+    # ── History ──
 
     def refresh_history(self):
         for row in self.history_tree.get_children():
@@ -123,88 +393,9 @@ class BookingPage(tk.Frame):
                 "", "end",
                 values=(
                     b.booking_id,
-                    b.flight.airline,
-                    b.flight.flight_id,
-                    f"{b.flight.origin} \u2192 {b.flight.destination}",
+                    f"{b.flight.origin}  \u2192  {b.flight.destination}",
                     b.flight.date,
+                    f"${b.flight.price}",
                     b.status,
                 ),
             )
-
-    def reset(self):
-        self._toggle_view(False)
-        self.from_city.set("")
-        self.to_city.set("")
-        self.date_var.set("")
-        for row in self.results_tree.get_children():
-            self.results_tree.delete(row)
-        self.selected_flight = None
-
-    def search(self):
-        origin = self.from_city.get()
-        destination = self.to_city.get()
-        date = self.date_var.get().strip()
-
-        if not origin or not destination or not date:
-            messagebox.showwarning("Incomplete", "Please fill in From, To, and Date.")
-            return
-        if origin == destination:
-            messagebox.showwarning("Same City", "From and To cities must be different.")
-            return
-
-        # Generate flights
-        flights = generate_flights(origin, destination, date)
-
-        # Clear tree
-        for row in self.results_tree.get_children():
-            self.results_tree.delete(row)
-
-        for f in flights:
-            self.results_tree.insert(
-                "", "end",
-                values=(f.airline, f.flight_id, f.date, f.departure_time, f.arrival_time, f"${f.price}"),
-                tags=(f,),
-            )
-
-        self.results_header.config(text=f"Flights: {origin} \u2192 {destination}  ({date})")
-
-    def on_select(self, event):
-        sel = self.results_tree.selection()
-        if not sel:
-            return
-        item = self.results_tree.item(sel[0])
-        self.selected_flight = item["tags"][0]
-
-        # Highlight
-        for row in self.results_tree.get_children():
-            self.results_tree.item(row, tags=())
-        self.results_tree.item(sel[0], tags=("selected",))
-
-    def book(self):
-        if not self.selected_flight:
-            messagebox.showwarning("No Selection", "Please select a flight first.")
-            return
-
-        flight = self.selected_flight
-        user = self.controller.current_user
-
-        booking = Booking(
-            user=user,
-            flight=flight,
-            passenger_name=user.name,
-        )
-
-        self.controller.add_booking(booking)
-
-        messagebox.showinfo(
-            "Booking Confirmed",
-            f"Booking ID: {booking.booking_id}\n"
-            f"Passenger: {booking.passenger_name}\n"
-            f"Flight: {flight.airline} {flight.flight_id}\n"
-            f"Route: {flight.origin} \u2192 {flight.destination}\n"
-            f"Date: {flight.date}  |  {flight.departure_time} - {flight.arrival_time}\n"
-            f"Price: ${flight.price}\n"
-            f"Status: {booking.status}",
-        )
-
-        self.selected_flight = None

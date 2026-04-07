@@ -4,23 +4,22 @@ from tkinter import ttk
 
 
 class Sidebar(ttk.Frame):
-    SIDEBAR_WIDTH = 220
+    SIDEBAR_WIDTH = 200
 
     def __init__(self, parent, controller):
         super().__init__(parent, style="Card.TFrame", width=self.SIDEBAR_WIDTH)
         self.controller = controller
-        self.pack_propagate(False)  # keep width
+        self.pack_propagate(False)
 
         self._build_nav()
         self._build_bookings_list()
 
     def _build_nav(self):
-        nav = ttk.Frame(self, style="Card.TFrame", padding=(12, 16, 12, 8))
+        nav = ttk.Frame(self, style="Card.TFrame", padding=(10, 14, 10, 8))
         nav.pack(fill="x")
 
-        ttk.Label(nav, text="TestSky", font=("Segoe UI", 16, "bold"), foreground="#1a1a2e", background="white").pack(
-            pady=(0, 16)
-        )
+        tk.Label(nav, text="\u2708\uFE0F TestSky", font=("Segoe UI", 14, "bold"),
+                 fg="#1e3a5f", bg="#ffffff").pack(pady=(4, 14))
 
         buttons = [
             ("Home", self.controller.show_home),
@@ -30,25 +29,33 @@ class Sidebar(ttk.Frame):
         ]
 
         for text, cmd in buttons:
-            style = "Danger.TButton" if text == "Logout" else "Primary.TButton"
-            btn = ttk.Button(nav, text=text, style=style, width=20, command=cmd)
+            if text == "Logout":
+                style_name = "Danger.TButton"
+            else:
+                style_name = "Primary.TButton"
+            btn = ttk.Button(nav, text=text, style=style_name, width=20,
+                             command=cmd)
             btn.pack(fill="x", pady=3)
 
-        ttk.Separator(self, orient="horizontal").pack(fill="x", padx=12, pady=8)
+        ttk.Separator(self, orient="horizontal").pack(fill="x", padx=10, pady=8)
 
-        ttk.Label(self, text="Recent Bookings", font=("Segoe UI", 10, "bold"), foreground="#555", background="white").pack(
-            padx=12, pady=(0, 4)
-        )
+        ttk.Label(self, text="Recent Bookings", font=("Segoe UI", 9, "bold"),
+                  foreground="#555", background="white").pack(
+            padx=10, pady=(0, 6))
 
     def _build_bookings_list(self):
-        frame = ttk.Frame(self, style="Card.TFrame", padding=(12, 0))
+        frame = ttk.Frame(self, style="Card.TFrame", padding=(10, 0))
         frame.pack(fill="both", expand=True)
 
-        self.bookings_listbox = tk.Listbox(frame, font=("Segoe UI", 9), bg="white", bd=0, highlightthickness=0)
+        self.bookings_listbox = tk.Listbox(frame, font=("Segoe UI", 8),
+                                           bg="#f8f9fa", borderwidth=1,
+                                           relief="flat")
         self.bookings_listbox.pack(fill="both", expand=True)
 
     def refresh_bookings(self):
         self.bookings_listbox.delete(0, tk.END)
-        for b in reversed(self.controller.bookings[-10:]):  # show last 10
-            entry = f"{b.booking_id}\n{b.flight.origin}\u2192{b.flight.destination}"
+        for b in reversed(self.controller.bookings[-15:]):  # show last 15
+            entry = (f"[{b.booking_id}]  "
+                     f"{b.flight.origin} \u2192 {b.flight.destination}  "
+                     f"(${b.flight.price})")
             self.bookings_listbox.insert(tk.END, entry)
