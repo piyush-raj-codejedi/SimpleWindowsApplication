@@ -61,8 +61,6 @@ class App:
         self._current_page = None
         self.show_login()
 
-        self.root.eval("tk::PlaceWindow . center")
-
     @staticmethod
     def _configure_style(style):
         style.configure("TFrame", background="#f4f6f9")
@@ -159,3 +157,21 @@ class App:
     def add_booking(self, booking):
         self.bookings.append(booking)
         self.sidebar.refresh_bookings()
+
+
+if __name__ == "__main__":
+    import sys
+    print("TestSky — Flight Booking Application", flush=True)
+    app = App()
+    # Force window to front
+    app.root.attributes("-topmost", True)
+    app.root.after(100, lambda: app.root.attributes("-topmost", False))
+    print(f"Window: {app.root.winfo_geometry()}", flush=True)
+    try:
+        app.run()
+    except Exception as e:
+        print(f"ERROR: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        input("Press Enter to close...")
+        sys.exit(1)
